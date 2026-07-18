@@ -198,13 +198,13 @@ with st.sidebar:
 # ============================================
 
 # Buscar dados
-nodes, edges = get_all_data(conn)
+nodes, edges, documents = get_all_data(conn)
 
 if not nodes:
     st.info("Adicione seus primeiros nós e arestas na barra lateral para começar.")
 else:
     # Construir e exibir o grafo
-    net = build_network(nodes, edges)
+    net = build_network(nodes, edges, documents)
     display_network(net)
 
 # Estatísticas

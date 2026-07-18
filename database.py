@@ -98,6 +98,11 @@ def get_nodes(conn):
 def get_edges(conn):
     return conn.execute("SELECT id, source, target, description FROM edges").fetchall()
 
+def get_documents(conn):
+    return conn.execute(
+        "SELECT entity_type, entity_id, original_name FROM documents"
+    ).fetchall()
+
 def get_all_data(conn):
-    """Retorna todos os dados (nós e arestas) para construir o grafo."""
-    return get_nodes(conn), get_edges(conn)
+    """Retorna todos os dados (nós, arestas e documentos) para construir o grafo."""
+    return get_nodes(conn), get_edges(conn), get_documents(conn)

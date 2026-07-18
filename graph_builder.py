@@ -1,3 +1,5 @@
+from collections import defaultdict
+
 from pyvis.network import Network
 import streamlit as st
 
@@ -18,10 +20,17 @@ def interpolate_color(color_a, color_b, t):
     )
 
 
-def build_network(nodes, edges):
-    """Cria um grafo Pyvis a partir de listas de nós e arestas."""
+def build_network(nodes, edges, documents=None):
+    """Cria um grafo Pyvis a partir de listas de nós, arestas e documentos."""
 
     net = Network(height="100vh", width="100%", directed=True)
+
+    document_map = {
+        'node': defaultdict(list),
+        'edge': defaultdict(list)
+    }
+    for entity_type, entity_id, original_name in documents or []:
+        document_map[entity_type][entity_id].append(original_name)
 
     # Determinar cores de nós com base na camada
     start_color = hex_to_rgb("#0000ff")  # azul
@@ -49,14 +58,18 @@ def build_network(nodes, edges):
         if description:
             title_parts.append(str(description))
 
+        if document_map['node'].get(node_id):
+            title_parts.append("Documentos:")
+            title_parts.extend(f"- {name}" for name in document_map['node'][node_id])
+
         net.add_node(node_id, label=label, title="\n".join(title_parts), color=color_hex)
 
     # Adicionar arestas com cor intermediária entre as extremidades
     for edge in edges:
         if len(edge) >= 4:
-            _, source, target, edesc = edge[0], edge[1], edge[2], edge[3]
+            edge_id, source, target, edesc = edge[0], edge[1], edge[2], edge[3]
         else:
-            source, target = edge[0], edge[1]
+            edge_id, source, target = edge[0], edge[1], edge[2]
             edesc = None
 
         source_color = hex_to_rgb(node_colors.get(source, "#888888"))
@@ -64,10 +77,16 @@ def build_network(nodes, edges):
         edge_rgb = interpolate_color(source_color, target_color, 0.5)
         edge_color = rgb_to_hex(edge_rgb)
 
+        edge_title_parts = []
         if edesc:
-            net.add_edge(source, target, title=str(edesc), color=edge_color)
-        else:
-            net.add_edge(source, target, color=edge_color)
+            edge_title_parts.append(str(edesc))
+
+        if document_map['edge'].get(edge_id):
+            edge_title_parts.append("Documentos:")
+            edge_title_parts.extend(f"- {name}" for name in document_map['edge'][edge_id])
+
+        title = "\n".join(edge_title_parts) if edge_title_parts else None
+        net.add_edge(source, target, title=title, color=edge_color)
 
     return net
 
