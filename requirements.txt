@@ -1,0 +1,4 @@
+# Dependências mínimas para executar a aplicação Vigra
+streamlit>=1.0
+pandas
+pyvis

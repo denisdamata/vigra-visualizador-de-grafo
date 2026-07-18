@@ -1,0 +1,46 @@
+# Ignorar arquivos gerados localmente e dados sensíveis
+
+# Byte-compiled / cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+.venv/
+venv/
+
+# Environment variables / secrets
+.env
+.env.*
+secrets.json
+credentials
+
+# Streamlit local state
+.streamlit/
+
+# Uploads and local DB
+uploads/
+database/
+*.sqlite
+*.db
+
+# Agent/tooling folders (local)
+.agents/
+.claude/
+
+# IDEs and editors
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+
+# Keys and certificates
+*.pem
+*.key
+
+# Jupyter
+.ipynb_checkpoints
+
+# Logs
+*.log
