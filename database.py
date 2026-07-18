@@ -71,6 +71,30 @@ def add_edge(conn, source, target, description=None, directed=1):
     conn.commit()
     return cursor.lastrowid
 
+def update_node(conn, node_id, label, layer, description=None):
+    cursor = conn.cursor()
+    cursor.execute(
+        "UPDATE nodes SET label=?, layer=?, description=? WHERE id=?",
+        (label, layer, description, node_id)
+    )
+    conn.commit()
+
+def update_edge(conn, edge_id, description=None, directed=1):
+    cursor = conn.cursor()
+    cursor.execute(
+        "UPDATE edges SET description=?, directed=? WHERE id=?",
+        (description, directed, edge_id)
+    )
+    conn.commit()
+
+def update_document(conn, document_id, description=None):
+    cursor = conn.cursor()
+    cursor.execute(
+        "UPDATE documents SET description=? WHERE id=?",
+        (description, document_id)
+    )
+    conn.commit()
+
 def delete_node(conn, node_id):
     cursor = conn.cursor()
     cursor.execute("DELETE FROM documents WHERE entity_type='node' AND entity_id=?", (node_id,))

@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-from database import get_connection, add_node, add_edge, delete_node, delete_edge, delete_document, get_nodes, get_edges, get_all_data
+from database import get_connection, add_node, add_edge, delete_node, delete_edge, delete_document, get_nodes, get_edges, get_all_data, update_node, update_edge, update_document
 from graph_builder import build_network, display_network
 from utils import save_uploaded_file, get_entity_label
 import os
@@ -39,13 +39,35 @@ with st.sidebar:
 
         st.divider()
         st.subheader("📋 Nós Existentes")
-        nodes_df = pd.read_sql("SELECT id, label, layer FROM nodes ORDER BY layer", conn)
+        nodes_df = pd.read_sql("SELECT id, label, layer, description FROM nodes ORDER BY layer", conn)
         if not nodes_df.empty:
             st.dataframe(nodes_df, use_container_width=True)
+            
+            st.subheader("✏️ Editar Nó")
             node_options = [
                 (f"{row['label']} (ID: {row['id']}, Camada: {row['layer']})", row['id'])
                 for _, row in nodes_df.iterrows()
             ]
+            edit_node_select = st.selectbox(
+                "Selecionar nó para editar",
+                options=[option[1] for option in node_options],
+                format_func=lambda node_id, node_options=node_options: next(label for label, id in node_options if id == node_id),
+                key="edit_node_select"
+            )
+            if edit_node_select:
+                node_to_edit = nodes_df[nodes_df['id'] == edit_node_select].iloc[0]
+                new_label = st.text_input("Rótulo", value=node_to_edit['label'], key="edit_node_label")
+                new_layer = st.number_input("Camada", value=node_to_edit['layer'], min_value=0, step=1, key="edit_node_layer")
+                new_description = st.text_area("Descrição", value=node_to_edit['description'] or "", key="edit_node_description", height=80)
+                if st.button("💾 Salvar alterações", use_container_width=True, key="save_node_edit"):
+                    try:
+                        update_node(conn, edit_node_select, new_label, new_layer, new_description or None)
+                        st.success("Nó atualizado!")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Erro ao atualizar: {e}")
+            
+            st.divider()
             selected_node_ids = st.multiselect(
                 "Selecionar nós para excluir",
                 options=[option[1] for option in node_options],
@@ -109,6 +131,30 @@ with st.sidebar:
                 )
                 for _, row in edges_df.iterrows()
             ]
+            
+            st.subheader("✏️ Editar Aresta")
+            edit_edge_select = st.selectbox(
+                "Selecionar aresta para editar",
+                options=[option[1] for option in edge_options],
+                format_func=lambda edge_id, edge_options=edge_options: next(label for label, id in edge_options if id == edge_id),
+                key="edit_edge_select"
+            )
+            if edit_edge_select:
+                edge_to_edit = conn.execute(
+                    "SELECT description, directed FROM edges WHERE id=?",
+                    (edit_edge_select,)
+                ).fetchone()
+                new_description = st.text_area("Descrição", value=edge_to_edit[0] or "", key="edit_edge_description", height=80)
+                new_directed = st.checkbox("Direcional", value=bool(edge_to_edit[1]), key="edit_edge_directed")
+                if st.button("💾 Salvar alterações", use_container_width=True, key="save_edge_edit"):
+                    try:
+                        update_edge(conn, edit_edge_select, new_description or None, 1 if new_directed else 0)
+                        st.success("Aresta atualizada!")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Erro ao atualizar: {e}")
+            
+            st.divider()
             selected_edge_ids = st.multiselect(
                 "Selecionar arestas para excluir",
                 options=[option[1] for option in edge_options],
@@ -186,6 +232,29 @@ with st.sidebar:
         """, conn)
 
         if not docs.empty:
+            st.subheader("✏️ Editar Documento")
+            doc_options = [
+                (f"{doc['original_name']}", doc['id'])
+                for _, doc in docs.iterrows()
+            ]
+            edit_doc_select = st.selectbox(
+                "Selecionar documento para editar",
+                options=[option[1] for option in doc_options],
+                format_func=lambda doc_id, doc_options=doc_options: next(label for label, id in doc_options if id == doc_id),
+                key="edit_doc_select"
+            )
+            if edit_doc_select:
+                doc_to_edit = docs[docs['id'] == edit_doc_select].iloc[0]
+                new_description = st.text_area("Descrição", value=doc_to_edit['description'] or "", key="edit_doc_description", height=80)
+                if st.button("💾 Salvar alterações", use_container_width=True, key="save_doc_edit"):
+                    try:
+                        update_document(conn, edit_doc_select, new_description or None)
+                        st.success("Documento atualizado!")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Erro ao atualizar: {e}")
+            
+            st.divider()
             for _, doc in docs.iterrows():
                 entity_label = doc['node_label'] if doc['entity_type'] == 'node' else doc['edge_label']
                 with st.expander(f"📎 {doc['original_name']} ({entity_label})"):
