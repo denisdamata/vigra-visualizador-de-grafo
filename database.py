@@ -16,7 +16,8 @@ def _create_tables(conn):
     CREATE TABLE IF NOT EXISTS nodes (
         id INTEGER PRIMARY KEY,
         label TEXT UNIQUE,
-        layer INTEGER
+        layer INTEGER,
+        description TEXT
     )
     """)
     cursor.execute("""
@@ -24,6 +25,7 @@ def _create_tables(conn):
         id INTEGER PRIMARY KEY,
         source INTEGER,
         target INTEGER,
+        description TEXT,
         FOREIGN KEY (source) REFERENCES nodes(id),
         FOREIGN KEY (target) REFERENCES nodes(id)
     )
@@ -41,16 +43,24 @@ def _create_tables(conn):
     )
     """)
     conn.commit()
+    # Ensure legacy databases get the new columns if missing
+    cols = [r[1] for r in conn.execute("PRAGMA table_info(nodes)").fetchall()]
+    if 'description' not in cols:
+        cursor.execute("ALTER TABLE nodes ADD COLUMN description TEXT")
+    cols_e = [r[1] for r in conn.execute("PRAGMA table_info(edges)").fetchall()]
+    if 'description' not in cols_e:
+        cursor.execute("ALTER TABLE edges ADD COLUMN description TEXT")
+    conn.commit()
 
-def add_node(conn, label, layer):
+def add_node(conn, label, layer, description=None):
     cursor = conn.cursor()
-    cursor.execute("INSERT INTO nodes (label, layer) VALUES (?, ?)", (label, layer))
+    cursor.execute("INSERT INTO nodes (label, layer, description) VALUES (?, ?, ?)", (label, layer, description))
     conn.commit()
     return cursor.lastrowid
 
-def add_edge(conn, source, target):
+def add_edge(conn, source, target, description=None):
     cursor = conn.cursor()
-    cursor.execute("INSERT INTO edges (source, target) VALUES (?, ?)", (source, target))
+    cursor.execute("INSERT INTO edges (source, target, description) VALUES (?, ?, ?)", (source, target, description))
     conn.commit()
     return cursor.lastrowid
 
@@ -83,10 +93,10 @@ def delete_document(conn, document_id):
     conn.commit()
 
 def get_nodes(conn):
-    return conn.execute("SELECT id, label, layer FROM nodes ORDER BY layer").fetchall()
+    return conn.execute("SELECT id, label, layer, description FROM nodes ORDER BY layer").fetchall()
 
 def get_edges(conn):
-    return conn.execute("SELECT source, target FROM edges").fetchall()
+    return conn.execute("SELECT id, source, target, description FROM edges").fetchall()
 
 def get_all_data(conn):
     """Retorna todos os dados (nós e arestas) para construir o grafo."""

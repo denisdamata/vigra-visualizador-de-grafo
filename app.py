@@ -8,8 +8,8 @@ import uuid
 from datetime import datetime
 
 # Configuração da página
-st.set_page_config(page_title="Grafo Filosófico", layout="wide")
-st.title("🌌 Grafo Filosófico Universal")
+st.set_page_config(page_title="Grafo Filosófico", page_icon="🦈", layout="wide")
+# st.title("🌌 Grafo Filosófico Universal")
 
 # Conectar ao banco de dados
 conn = get_connection()
@@ -27,10 +27,11 @@ with st.sidebar:
         st.subheader("Adicionar Nó")
         label = st.text_input("Rótulo", key="new_node_label")
         layer = st.number_input("Camada", min_value=0, step=1, key="new_node_layer")
+        node_description = st.text_area("Descrição (opcional)", key="new_node_description", height=80)
         if st.button("➕ Adicionar Nó", use_container_width=True):
             if label:
                 try:
-                    add_node(conn, label, layer)
+                    add_node(conn, label, layer, node_description or None)
                     st.success(f"Nó '{label}' adicionado!")
                     st.rerun()
                 except Exception as e:
@@ -74,12 +75,11 @@ with st.sidebar:
         else:
             source = st.selectbox("Origem", options=list(node_options.keys()), key="source_select")
             target = st.selectbox("Destino", options=list(node_options.keys()), key="target_select")
+            edge_description = st.text_area("Descrição da aresta (opcional)", key="new_edge_description", height=80)
             if st.button("➕ Adicionar Aresta", use_container_width=True):
                 if source and target:
                     try:
-                        conn.execute("INSERT INTO edges (source, target) VALUES (?, ?)",
-                                    (node_options[source], node_options[target]))
-                        conn.commit()
+                        add_edge(conn, node_options[source], node_options[target], edge_description or None)
                         st.success("Aresta adicionada!")
                         st.rerun()
                     except Exception as e:
