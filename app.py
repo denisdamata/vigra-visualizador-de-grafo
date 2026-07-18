@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-from database import get_connection, add_node, add_edge, get_nodes, get_edges, get_all_data
+from database import get_connection, add_node, add_edge, delete_node, delete_edge, delete_document, get_nodes, get_edges, get_all_data
 from graph_builder import build_network, display_network
 from utils import save_uploaded_file, get_entity_label
 import os
@@ -35,6 +35,35 @@ with st.sidebar:
                     st.rerun()
                 except Exception as e:
                     st.error(f"Erro: {e}")
+
+        st.divider()
+        st.subheader("📋 Nós Existentes")
+        nodes_df = pd.read_sql("SELECT id, label, layer FROM nodes ORDER BY layer", conn)
+        if not nodes_df.empty:
+            st.dataframe(nodes_df, use_container_width=True)
+            node_options = [
+                (f"{row['label']} (ID: {row['id']}, Camada: {row['layer']})", row['id'])
+                for _, row in nodes_df.iterrows()
+            ]
+            selected_node_ids = st.multiselect(
+                "Selecionar nós para excluir",
+                options=[option[1] for option in node_options],
+                format_func=lambda node_id, node_options=node_options: next(label for label, id in node_options if id == node_id),
+            )
+            if st.button("🗑️ Excluir nós selecionados", use_container_width=True):
+                if selected_node_ids:
+                    try:
+                        for node_id in selected_node_ids:
+                            delete_node(conn, int(node_id))
+                        st.success(f"{len(selected_node_ids)} nó(s) excluído(s).")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Erro ao excluir nós: {e}")
+                else:
+                    st.warning("Selecione pelo menos um nó para excluir.")
+        else:
+            st.info("Nenhum nó cadastrado ainda.")
+
     with tab2:
         st.subheader("Adicionar Aresta")
         nodes = conn.execute("SELECT id, label FROM nodes").fetchall()
@@ -64,7 +93,30 @@ with st.sidebar:
             JOIN nodes n1 ON e.source = n1.id
             JOIN nodes n2 ON e.target = n2.id
         """, conn)
-        st.dataframe(edges_df, use_container_width=True)
+        if not edges_df.empty:
+            st.dataframe(edges_df, use_container_width=True)
+            edge_options = [
+                (f"{row['source_label']} → {row['target_label']} (ID: {row['id']})", row['id'])
+                for _, row in edges_df.iterrows()
+            ]
+            selected_edge_ids = st.multiselect(
+                "Selecionar arestas para excluir",
+                options=[option[1] for option in edge_options],
+                format_func=lambda edge_id, edge_options=edge_options: next(label for label, id in edge_options if id == edge_id),
+            )
+            if st.button("🗑️ Excluir arestas selecionadas", use_container_width=True):
+                if selected_edge_ids:
+                    try:
+                        for edge_id in selected_edge_ids:
+                            delete_edge(conn, int(edge_id))
+                        st.success(f"{len(selected_edge_ids)} aresta(s) excluída(s).")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Erro ao excluir arestas: {e}")
+                else:
+                    st.warning("Selecione pelo menos uma aresta para excluir.")
+        else:
+            st.info("Nenhuma aresta cadastrada ainda.")
 
     with tab3:
         st.subheader("📄 Anexar Documento")
@@ -114,7 +166,7 @@ with st.sidebar:
         st.divider()
         st.subheader("📋 Documentos Anexados")
         docs = pd.read_sql("""
-            SELECT d.id, d.entity_type, d.entity_id, d.original_name, d.description,
+            SELECT d.id, d.entity_type, d.entity_id, d.filename, d.original_name, d.description,
                 n.label as node_label,
                 e.source || ' → ' || e.target as edge_label
             FROM documents d
@@ -128,16 +180,22 @@ with st.sidebar:
                 entity_label = doc['node_label'] if doc['entity_type'] == 'node' else doc['edge_label']
                 with st.expander(f"📎 {doc['original_name']} ({entity_label})"):
                     st.write(f"**Descrição:** {doc['description'] or 'Sem descrição'}")
-                    if st.button(f"🔗 Abrir", key=f"open_{doc['id']}"):
-                        # Gera um link para o arquivo
+                    cols = st.columns([1, 1])
+                    if cols[0].button(f"🔗 Abrir", key=f"open_{doc['id']}"):
                         st.markdown(f"[Abrir arquivo](uploads/{doc['filename']})", unsafe_allow_html=True)
+                    if cols[1].button(f"🗑️ Excluir documento", key=f"delete_doc_{doc['id']}"):
+                        try:
+                            delete_document(conn, doc['id'])
+                            st.success(f"Documento '{doc['original_name']}' excluído.")
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"Erro ao excluir documento: {e}")
         else:
             st.info("Nenhum documento anexado.")
 
 # ============================================
 # ÁREA PRINCIPAL: Visualização do grafo
 # ============================================
-st.subheader("📊 Visualização do Grafo")
 
 # Buscar dados
 nodes, edges = get_all_data(conn)
