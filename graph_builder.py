@@ -21,7 +21,7 @@ def interpolate_color(color_a, color_b, t):
 
 
 def build_network(nodes, edges, documents=None):
-    """Cria um grafo Pyvis a partir de listas de nós, arestas e documentos."""
+    """Build a Pyvis graph from lists of nodes, edges, and documents."""
 
     net = Network(height="100vh", width="100%", directed=False)
 
@@ -32,9 +32,9 @@ def build_network(nodes, edges, documents=None):
     for entity_type, entity_id, original_name in documents or []:
         document_map[entity_type][entity_id].append(original_name)
 
-    # Determinar cores de nós com base na camada
-    start_color = hex_to_rgb("#0000ff")  # azul
-    end_color = hex_to_rgb("#ff0000")  # vermelho
+    # Determine node colors based on layer
+    start_color = hex_to_rgb("#0000ff")  # blue
+    end_color = hex_to_rgb("#ff0000")  # red
 
     node_colors = {}
     layers = [node[2] for node in nodes if len(node) >= 3]
@@ -54,17 +54,31 @@ def build_network(nodes, edges, documents=None):
         color_hex = rgb_to_hex(rgb_color)
         node_colors[node_id] = color_hex
 
-        title_parts = [f"Camada: {layer}"]
+        title_parts = [f"Layer: {layer}"]
         if description:
             title_parts.append(str(description))
 
         if document_map['node'].get(node_id):
-            title_parts.append("Documentos:")
+            title_parts.append("Documents:")
             title_parts.extend(f"- {name}" for name in document_map['node'][node_id])
 
-        net.add_node(node_id, label=label, title="\n".join(title_parts), color=color_hex)
+        net.add_node(
+            node_id,
+            label=label,
+            title="\n".join(title_parts),
+            color=color_hex,
+            size=24,
+            borderWidth=2,
+            font={
+                "size": 18,
+                "face": "Arial",
+                "color": "#111111",
+                "strokeWidth": 1,
+                "strokeColor": "#ffffff"
+            }
+        )
 
-    # Adicionar arestas com cor intermediária entre as extremidades
+    # Add edges with an intermediate color based on the endpoints
     for edge in edges:
         if len(edge) >= 5:
             edge_id, source, target, edesc, directed = edge[0], edge[1], edge[2], edge[3], edge[4]
@@ -86,7 +100,7 @@ def build_network(nodes, edges, documents=None):
             edge_title_parts.append(str(edesc))
 
         if document_map['edge'].get(edge_id):
-            edge_title_parts.append("Documentos:")
+            edge_title_parts.append("Documents:")
             edge_title_parts.extend(f"- {name}" for name in document_map['edge'][edge_id])
 
         title = "\n".join(edge_title_parts) if edge_title_parts else None
@@ -99,6 +113,6 @@ def build_network(nodes, edges, documents=None):
 
 
 def display_network(net):
-    """Exibe o grafo interativo no Streamlit."""
+    """Display the interactive graph in Streamlit."""
     net_html = net.generate_html()
     st.components.v1.html(net_html, height=650)

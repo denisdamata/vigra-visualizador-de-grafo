@@ -1,36 +1,36 @@
-# Vigra - Visualizador de Grafo
+# Vigra - Graph Visualizer
 
 ![Vigra Logo](vigra.png)
 
-> Visualizador simples de grafos construído com Streamlit e Pyvis.
+> Simple graph visualizer built with Streamlit and Pyvis.
 
-Características:
-- Criar/abrir/deletar múltiplos grafos
-- Adicionar, editar e excluir nós e arestas
-- Anexar documentos a nós/arestas
-- Visualização interativa com cores em gradiente por camada
+Features:
+- Create/open/delete multiple graphs
+- Add, edit, and delete nodes and edges
+- Attach documents to nodes and edges
+- Interactive graph visualization with gradient node coloring by layer
 
-Como executar localmente:
+How to run locally:
 
-1. Crie e ative um ambiente virtual (recomendado):
+1. Create and activate a virtual environment (recommended):
 
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
 ```
 
-2. Instale dependências:
+2. Install dependencies:
 
 ```bash
 pip install -r requirements.txt
 ```
 
-3. Rode a aplicação:
+3. Run the app:
 
 ```bash
 streamlit run app.py
 ```
 
-Aplicação construída com IA.
+Application built with AI.
 
 

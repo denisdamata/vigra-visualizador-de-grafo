@@ -172,7 +172,7 @@ def get_documents(conn, graph_id=1):
     ).fetchall()
 
 def get_all_data(conn, graph_id=1):
-    """Retorna todos os dados (nós, arestas e documentos) para construir o grafo."""
+    """Return all data (nodes, edges, and documents) to build the graph."""
     return get_nodes(conn, graph_id), get_edges(conn, graph_id), get_documents(conn, graph_id)
 
 def create_graph(conn, name):

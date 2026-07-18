@@ -8,7 +8,7 @@ def ensure_upload_dir():
     os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 def save_uploaded_file(uploaded_file):
-    """Salva o arquivo no disco e retorna o nome do arquivo e o caminho."""
+    """Save the uploaded file to disk and return its name and path."""
     ensure_upload_dir()
     ext = uploaded_file.name.split(".")[-1]
     filename = f"{uuid.uuid4()}.{ext}"
@@ -18,7 +18,7 @@ def save_uploaded_file(uploaded_file):
     return filename, filepath
 
 def get_entity_label(conn, entity_type, entity_id):
-    """Retorna o rótulo de um nó ou aresta para exibição."""
+    """Return the label of a node or edge for display."""
     if entity_type == "node":
         result = conn.execute("SELECT label FROM nodes WHERE id = ?", (entity_id,)).fetchone()
         return result[0] if result else None
