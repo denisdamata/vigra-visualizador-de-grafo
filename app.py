@@ -75,11 +75,18 @@ with st.sidebar:
         else:
             source = st.selectbox("Origem", options=list(node_options.keys()), key="source_select")
             target = st.selectbox("Destino", options=list(node_options.keys()), key="target_select")
+            directed = st.checkbox("Direcional", value=True, key="new_edge_directed")
             edge_description = st.text_area("Descrição da aresta (opcional)", key="new_edge_description", height=80)
             if st.button("➕ Adicionar Aresta", use_container_width=True):
                 if source and target:
                     try:
-                        add_edge(conn, node_options[source], node_options[target], edge_description or None)
+                        add_edge(
+                            conn,
+                            node_options[source],
+                            node_options[target],
+                            edge_description or None,
+                            1 if directed else 0
+                        )
                         st.success("Aresta adicionada!")
                         st.rerun()
                     except Exception as e:
@@ -88,7 +95,7 @@ with st.sidebar:
         st.divider()
         st.subheader("📋 Arestas Existentes")
         edges_df = pd.read_sql("""
-            SELECT e.id, n1.label as source_label, n2.label as target_label
+            SELECT e.id, n1.label as source_label, n2.label as target_label, e.directed
             FROM edges e
             JOIN nodes n1 ON e.source = n1.id
             JOIN nodes n2 ON e.target = n2.id
@@ -96,7 +103,10 @@ with st.sidebar:
         if not edges_df.empty:
             st.dataframe(edges_df, use_container_width=True)
             edge_options = [
-                (f"{row['source_label']} → {row['target_label']} (ID: {row['id']})", row['id'])
+                (
+                    f"{row['source_label']} {'→' if row['directed'] else '--'} {row['target_label']} (ID: {row['id']})",
+                    row['id']
+                )
                 for _, row in edges_df.iterrows()
             ]
             selected_edge_ids = st.multiselect(

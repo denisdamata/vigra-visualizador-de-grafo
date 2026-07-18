@@ -26,6 +26,7 @@ def _create_tables(conn):
         source INTEGER,
         target INTEGER,
         description TEXT,
+        directed INTEGER DEFAULT 1,
         FOREIGN KEY (source) REFERENCES nodes(id),
         FOREIGN KEY (target) REFERENCES nodes(id)
     )
@@ -50,6 +51,9 @@ def _create_tables(conn):
     cols_e = [r[1] for r in conn.execute("PRAGMA table_info(edges)").fetchall()]
     if 'description' not in cols_e:
         cursor.execute("ALTER TABLE edges ADD COLUMN description TEXT")
+    if 'directed' not in cols_e:
+        cursor.execute("ALTER TABLE edges ADD COLUMN directed INTEGER DEFAULT 1")
+        cursor.execute("UPDATE edges SET directed=1 WHERE directed IS NULL")
     conn.commit()
 
 def add_node(conn, label, layer, description=None):
@@ -58,9 +62,12 @@ def add_node(conn, label, layer, description=None):
     conn.commit()
     return cursor.lastrowid
 
-def add_edge(conn, source, target, description=None):
+def add_edge(conn, source, target, description=None, directed=1):
     cursor = conn.cursor()
-    cursor.execute("INSERT INTO edges (source, target, description) VALUES (?, ?, ?)", (source, target, description))
+    cursor.execute(
+        "INSERT INTO edges (source, target, description, directed) VALUES (?, ?, ?, ?)",
+        (source, target, description, directed)
+    )
     conn.commit()
     return cursor.lastrowid
 
@@ -96,7 +103,7 @@ def get_nodes(conn):
     return conn.execute("SELECT id, label, layer, description FROM nodes ORDER BY layer").fetchall()
 
 def get_edges(conn):
-    return conn.execute("SELECT id, source, target, description FROM edges").fetchall()
+    return conn.execute("SELECT id, source, target, description, directed FROM edges").fetchall()
 
 def get_documents(conn):
     return conn.execute(

@@ -23,7 +23,7 @@ def interpolate_color(color_a, color_b, t):
 def build_network(nodes, edges, documents=None):
     """Cria um grafo Pyvis a partir de listas de nós, arestas e documentos."""
 
-    net = Network(height="100vh", width="100%", directed=True)
+    net = Network(height="100vh", width="100%", directed=False)
 
     document_map = {
         'node': defaultdict(list),
@@ -66,11 +66,15 @@ def build_network(nodes, edges, documents=None):
 
     # Adicionar arestas com cor intermediária entre as extremidades
     for edge in edges:
-        if len(edge) >= 4:
+        if len(edge) >= 5:
+            edge_id, source, target, edesc, directed = edge[0], edge[1], edge[2], edge[3], edge[4]
+        elif len(edge) == 4:
             edge_id, source, target, edesc = edge[0], edge[1], edge[2], edge[3]
+            directed = 1
         else:
             edge_id, source, target = edge[0], edge[1], edge[2]
             edesc = None
+            directed = 1
 
         source_color = hex_to_rgb(node_colors.get(source, "#888888"))
         target_color = hex_to_rgb(node_colors.get(target, "#888888"))
@@ -86,7 +90,10 @@ def build_network(nodes, edges, documents=None):
             edge_title_parts.extend(f"- {name}" for name in document_map['edge'][edge_id])
 
         title = "\n".join(edge_title_parts) if edge_title_parts else None
-        net.add_edge(source, target, title=title, color=edge_color)
+        if directed:
+            net.add_edge(source, target, title=title, color=edge_color, arrows="to")
+        else:
+            net.add_edge(source, target, title=title, color=edge_color)
 
     return net
 
