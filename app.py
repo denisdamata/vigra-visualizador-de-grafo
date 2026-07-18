@@ -12,7 +12,7 @@ import uuid
 from datetime import datetime
 
 # Configuração da página
-st.set_page_config(page_title="Grafo Filosófico", page_icon="🦈", layout="wide")
+st.set_page_config(page_title="Vigra - Visualizador de Grafo", page_icon="🕸️", layout="wide")
 
 # Conectar ao banco de dados
 conn = get_connection()
