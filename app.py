@@ -1,6 +1,10 @@
 import streamlit as st
 import pandas as pd
-from database import get_connection, add_node, add_edge, delete_node, delete_edge, delete_document, get_nodes, get_edges, get_all_data, update_node, update_edge, update_document
+from database import (
+    get_connection, add_node, add_edge, delete_node, delete_edge, delete_document,
+    get_nodes, get_edges, get_all_data, update_node, update_edge, update_document,
+    create_graph, list_graphs, delete_graph, graph_exists
+)
 from graph_builder import build_network, display_network
 from utils import save_uploaded_file, get_entity_label
 import os
@@ -9,16 +13,114 @@ from datetime import datetime
 
 # Configuração da página
 st.set_page_config(page_title="Grafo Filosófico", page_icon="🦈", layout="wide")
-# st.title("🌌 Grafo Filosófico Universal")
 
 # Conectar ao banco de dados
 conn = get_connection()
 
+# Initialize session state
+if "current_graph" not in st.session_state:
+    st.session_state.current_graph = 1
+
 # ============================================
-# SIDEBAR
+# SIDEBAR - Gerenciador de Grafos
 # ============================================
 with st.sidebar:
-    st.header("📂 Gerenciar Grafo")
+    col_header, col_settings = st.columns([4, 1])
+    
+    with col_header:
+        st.header(f"📂 Editar Grafo #{st.session_state.current_graph}")
+    
+    with col_settings:
+        if st.button("⚙️", key="settings_btn", help="Gerenciador de Grafos"):
+            st.session_state.show_graph_settings = not st.session_state.get("show_graph_settings", False)
+    
+    if st.session_state.get("show_graph_settings", False):
+        st.divider()
+        col_menu1, col_menu2 = st.columns(2)
+        
+        with col_menu1:
+            if st.button("➕ Novo", use_container_width=True):
+                st.session_state.show_new_graph = True
+        
+        with col_menu2:
+            if st.button("🗑️ Deletar", use_container_width=True):
+                st.session_state.show_delete_graph = True
+        
+        # Dropdown para abrir grafo
+        graphs = list_graphs(conn)
+        if graphs:
+            graph_names = {g[1]: g[0] for g in graphs}
+            current_graph_name = next((g[1] for g in graphs if g[0] == st.session_state.current_graph), "Default")
+            selected_graph_name = st.selectbox(
+                "📂 Abrir Grafo",
+                options=list(graph_names.keys()),
+                index=list(graph_names.keys()).index(current_graph_name),
+                key="graph_selector"
+            )
+            if selected_graph_name and st.session_state.current_graph != graph_names[selected_graph_name]:
+                st.session_state.current_graph = graph_names[selected_graph_name]
+                st.rerun()
+        
+        st.caption(f"Grafos: {len(graphs)}")
+        
+        # Dialog para criar novo grafo
+        if st.session_state.get("show_new_graph", False):
+            st.divider()
+            new_graph_name = st.text_input("Nome do novo grafo", key="new_graph_input")
+            col1, col2 = st.columns(2)
+            with col1:
+                if st.button("✓ Criar", use_container_width=True, key="create_graph_btn"):
+                    if new_graph_name:
+                        try:
+                            new_id = create_graph(conn, new_graph_name)
+                            st.session_state.current_graph = new_id
+                            st.session_state.show_new_graph = False
+                            st.success(f"Grafo '{new_graph_name}' criado!")
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"Erro ao criar grafo: {e}")
+                    else:
+                        st.warning("Digite um nome para o grafo.")
+            with col2:
+                if st.button("✗ Cancelar", use_container_width=True):
+                    st.session_state.show_new_graph = False
+        
+        # Dialog para deletar grafo
+        if st.session_state.get("show_delete_graph", False):
+            st.divider()
+            graphs = list_graphs(conn)
+            if len(graphs) > 1:
+                deletable_graphs = [g for g in graphs if g[0] != 1]
+                if deletable_graphs:
+                    graph_to_delete_name = st.selectbox(
+                        "Selecionar grafo",
+                        options=[g[1] for g in deletable_graphs],
+                        key="delete_graph_select"
+                    )
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        if st.button("✓ Deletar", use_container_width=True, key="confirm_delete_btn"):
+                            graph_to_delete_id = next(g[0] for g in deletable_graphs if g[1] == graph_to_delete_name)
+                            try:
+                                delete_graph(conn, graph_to_delete_id)
+                                if st.session_state.current_graph == graph_to_delete_id:
+                                    st.session_state.current_graph = 1
+                                st.session_state.show_delete_graph = False
+                                st.success(f"Grafo '{graph_to_delete_name}' deletado!")
+                                st.rerun()
+                            except Exception as e:
+                                st.error(f"Erro ao deletar: {e}")
+                    with col2:
+                        if st.button("✗ Cancelar", use_container_width=True):
+                            st.session_state.show_delete_graph = False
+                else:
+                    st.info("Apenas o grafo padrão existe.")
+            else:
+                st.info("Não há grafos para deletar.")
+        st.divider()
+    else:
+        st.divider()
+    
     tab1, tab2, tab3 = st.tabs(["➕ Nós", "🔗 Arestas", "📄 Documentos"])
 
     # [TABS 1 e 2 ... (código existente, mas usando as funções do database.py)]
@@ -31,7 +133,7 @@ with st.sidebar:
         if st.button("➕ Adicionar Nó", use_container_width=True):
             if label:
                 try:
-                    add_node(conn, label, layer, node_description or None)
+                    add_node(conn, label, layer, node_description or None, st.session_state.current_graph)
                     st.success(f"Nó '{label}' adicionado!")
                     st.rerun()
                 except Exception as e:
@@ -39,7 +141,11 @@ with st.sidebar:
 
         st.divider()
         st.subheader("📋 Nós Existentes")
-        nodes_df = pd.read_sql("SELECT id, label, layer, description FROM nodes ORDER BY layer", conn)
+        nodes_df = pd.read_sql(
+            "SELECT id, label, layer, description FROM nodes WHERE graph_id=? ORDER BY layer",
+            conn,
+            params=(st.session_state.current_graph,)
+        )
         if not nodes_df.empty:
             st.dataframe(nodes_df, use_container_width=True)
             
@@ -89,7 +195,10 @@ with st.sidebar:
 
     with tab2:
         st.subheader("Adicionar Aresta")
-        nodes = conn.execute("SELECT id, label FROM nodes").fetchall()
+        nodes = conn.execute(
+            "SELECT id, label FROM nodes WHERE graph_id=?",
+            (st.session_state.current_graph,)
+        ).fetchall()
         node_options = {f"{label} (ID: {id})": id for id, label in nodes}
 
         if len(nodes) < 2:
@@ -107,7 +216,8 @@ with st.sidebar:
                             node_options[source],
                             node_options[target],
                             edge_description or None,
-                            1 if directed else 0
+                            1 if directed else 0,
+                            st.session_state.current_graph
                         )
                         st.success("Aresta adicionada!")
                         st.rerun()
@@ -121,7 +231,8 @@ with st.sidebar:
             FROM edges e
             JOIN nodes n1 ON e.source = n1.id
             JOIN nodes n2 ON e.target = n2.id
-        """, conn)
+            WHERE e.graph_id = ?
+        """, conn, params=(st.session_state.current_graph,))
         if not edges_df.empty:
             st.dataframe(edges_df, use_container_width=True)
             edge_options = [
@@ -182,14 +293,18 @@ with st.sidebar:
             entity_type = st.selectbox("Vincular a", ["node", "edge"])
 
             if entity_type == "node":
-                entities = conn.execute("SELECT id, label FROM nodes").fetchall()
+                entities = conn.execute(
+                    "SELECT id, label FROM nodes WHERE graph_id=?",
+                    (st.session_state.current_graph,)
+                ).fetchall()
             else:
                 entities = conn.execute("""
                     SELECT e.id, n1.label || ' → ' || n2.label as label
                     FROM edges e
                     JOIN nodes n1 ON e.source = n1.id
                     JOIN nodes n2 ON e.target = n2.id
-                """).fetchall()
+                    WHERE e.graph_id = ?
+                """, (st.session_state.current_graph,)).fetchall()
 
             if entities:
                 entity_options = {f"{label} (ID: {id})": id for id, label in entities}
@@ -208,9 +323,9 @@ with st.sidebar:
 
                             # Salvar no banco
                             conn.execute("""
-                                INSERT INTO documents (entity_type, entity_id, filename, original_name, mime_type, description, uploaded_at)
-                                VALUES (?, ?, ?, ?, ?, ?, ?)
-                            """, (entity_type, entity_options[entity], filename, uploaded_file.name, uploaded_file.type, description, datetime.now()))
+                                INSERT INTO documents (graph_id, entity_type, entity_id, filename, original_name, mime_type, description, uploaded_at)
+                                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                            """, (st.session_state.current_graph, entity_type, entity_options[entity], filename, uploaded_file.name, uploaded_file.type, description, datetime.now()))
                             conn.commit()
                             st.success(f"Documento '{uploaded_file.name}' anexado!")
                             st.rerun()
@@ -228,8 +343,9 @@ with st.sidebar:
             FROM documents d
             LEFT JOIN nodes n ON d.entity_type='node' AND d.entity_id=n.id
             LEFT JOIN edges e ON d.entity_type='edge' AND d.entity_id=e.id
+            WHERE d.graph_id = ?
             ORDER BY d.uploaded_at DESC
-        """, conn)
+        """, conn, params=(st.session_state.current_graph,))
 
         if not docs.empty:
             st.subheader("✏️ Editar Documento")
@@ -277,7 +393,7 @@ with st.sidebar:
 # ============================================
 
 # Buscar dados
-nodes, edges, documents = get_all_data(conn)
+nodes, edges, documents = get_all_data(conn, st.session_state.current_graph)
 
 if not nodes:
     st.info("Adicione seus primeiros nós e arestas na barra lateral para começar.")
@@ -293,7 +409,10 @@ with col1:
 with col2:
     st.metric("Arestas", len(edges))
 with col3:
-    docs_count = conn.execute("SELECT COUNT(*) FROM documents").fetchone()[0]
+    docs_count = conn.execute(
+        "SELECT COUNT(*) FROM documents WHERE graph_id=?",
+        (st.session_state.current_graph,)
+    ).fetchone()[0]
     st.metric("Documentos", docs_count)
 
 # Fechar conexão
