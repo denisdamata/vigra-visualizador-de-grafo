@@ -18,6 +18,30 @@ st.set_page_config(page_title="Vigra - Graph Visualizer", page_icon="🕸️", l
 st.markdown(
     """
     <style>
+        .stAppHeader {
+            padding: 0.25rem 1rem !important;
+            min-height: 40px !important;
+            max-height: 40px !important;
+        }
+        .stAppToolbar {
+            padding: 0.25rem 0 !important;
+            min-height: 40px !important;
+            max-height: 40px !important;
+        }
+        [data-testid="stHeader"] {
+            padding: 0.25rem 1rem !important;
+            min-height: 40px !important;
+            max-height: 40px !important;
+        }
+        [data-testid="stToolbar"] {
+            padding: 0.25rem 0 !important;
+            min-height: 40px !important;
+            max-height: 40px !important;
+        }
+        [data-testid="stMainBlockContainer"] {
+            padding-top: 20px !important;
+            margin-top: 0 !important;      
+        }
         [data-testid="stAppViewContainer"] {
             color: #111 !important;
             font-family: 'Inter', 'Segoe UI', sans-serif;

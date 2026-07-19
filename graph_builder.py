@@ -32,9 +32,13 @@ def build_network(nodes, edges, documents=None):
     for entity_type, entity_id, original_name in documents or []:
         document_map[entity_type][entity_id].append(original_name)
 
-    # Determine node colors based on layer
+    # Determine node colors and sizes based on layer
     start_color = hex_to_rgb("#0000ff")  # blue
     end_color = hex_to_rgb("#ff0000")  # red
+
+    # Size limits for nodes
+    min_node_size = 30
+    max_node_size = 10
 
     node_colors = {}
     layers = [node[2] for node in nodes if len(node) >= 3]
@@ -54,6 +58,9 @@ def build_network(nodes, edges, documents=None):
         color_hex = rgb_to_hex(rgb_color)
         node_colors[node_id] = color_hex
 
+        # Calculate node size based on normalized layer
+        node_size = min_node_size + (max_node_size - min_node_size) * t
+
         title_parts = [f"Layer: {layer}"]
         if description:
             title_parts.append(str(description))
@@ -67,7 +74,7 @@ def build_network(nodes, edges, documents=None):
             label=label,
             title="\n".join(title_parts),
             color=color_hex,
-            size=24,
+            size=node_size,
             borderWidth=2,
             font={
                 "size": 18,
