@@ -20,7 +20,9 @@ credentials
 
 # Uploads and local DB
 uploads/*
+!uploads/.gitkeep
 database/*
+!database/.gitkeep
 *.sqlite
 *.db
 
