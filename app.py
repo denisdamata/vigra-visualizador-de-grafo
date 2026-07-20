@@ -74,6 +74,22 @@ conn = get_connection()
 if "current_graph" not in st.session_state:
     st.session_state.current_graph = 1
 
+# Initialize input fields to empty on first load only
+if "new_node_label" not in st.session_state:
+    st.session_state.new_node_label = ""
+if "new_node_layer" not in st.session_state:
+    st.session_state.new_node_layer = 0
+if "new_node_description" not in st.session_state:
+    st.session_state.new_node_description = ""
+if "new_edge_description" not in st.session_state:
+    st.session_state.new_edge_description = ""
+if "doc_description" not in st.session_state:
+    st.session_state.doc_description = ""
+
+# Add a counter to force input re-rendering
+if "input_key_counter" not in st.session_state:
+    st.session_state.input_key_counter = 0
+
 # ============================================
 # SIDEBAR - Graph Manager
 # ============================================
@@ -180,14 +196,16 @@ with st.sidebar:
     # Example to add a node:
     with tab1:
         st.subheader("Add Node")
-        label = st.text_input("Label", key="new_node_label")
-        layer = st.number_input("Layer", min_value=0, step=1, key="new_node_layer")
-        node_description = st.text_area("Description (optional)", key="new_node_description", height=80)
+        label = st.text_input("Label", key=f"new_node_label_{st.session_state.input_key_counter}")
+        layer = st.number_input("Layer", min_value=0, step=1, key=f"new_node_layer_{st.session_state.input_key_counter}")
+        node_description = st.text_area("Description (optional)", key=f"new_node_description_{st.session_state.input_key_counter}", height=80)
         if st.button("➕ Add Node", use_container_width=True):
             if label:
                 try:
                     add_node(conn, label, layer, node_description or None, st.session_state.current_graph)
                     st.success(f"Node '{label}' added!")
+                    # Clear inputs by incrementing the counter
+                    st.session_state.input_key_counter += 1
                     st.rerun()
                 except Exception as e:
                     st.error(f"Error: {e}")
@@ -215,10 +233,10 @@ with st.sidebar:
             )
             if edit_node_select:
                 node_to_edit = nodes_df[nodes_df['id'] == edit_node_select].iloc[0]
-                new_label = st.text_input("Label", value=node_to_edit['label'], key="edit_node_label")
-                new_layer = st.number_input("Layer", value=node_to_edit['layer'], min_value=0, step=1, key="edit_node_layer")
-                new_description = st.text_area("Description", value=node_to_edit['description'] or "", key="edit_node_description", height=80)
-                if st.button("💾 Save changes", use_container_width=True, key="save_node_edit"):
+                new_label = st.text_input("Label", value=node_to_edit['label'], key=f"edit_node_label_{edit_node_select}")
+                new_layer = st.number_input("Layer", value=node_to_edit['layer'], min_value=0, step=1, key=f"edit_node_layer_{edit_node_select}")
+                new_description = st.text_area("Description", value=node_to_edit['description'] or "", key=f"edit_node_description_{edit_node_select}", height=80)
+                if st.button("💾 Save changes", use_container_width=True, key=f"save_node_edit_{edit_node_select}"):
                     try:
                         update_node(conn, edit_node_select, new_label, new_layer, new_description or None)
                         st.success("Node updated!")
@@ -234,15 +252,34 @@ with st.sidebar:
             )
             if st.button("🗑️ Delete selected nodes", use_container_width=True):
                 if selected_node_ids:
+                    st.session_state.confirm_delete_nodes = True
+                    st.session_state.nodes_to_delete = selected_node_ids
+                    st.rerun()
+                else:
+                    st.warning("Select at least one node to delete.")
+
+            # Confirmation dialog for deleting nodes
+            if st.session_state.get("confirm_delete_nodes", False):
+                st.warning("⚠️ Are you sure you want to delete the following nodes?")
+                nodes_to_delete = st.session_state.nodes_to_delete
+                for node_id in nodes_to_delete:
+                    node_label = next(label for label, id in node_options if id == node_id)
+                    st.write(f"- {node_label}")
+                col1, col2 = st.columns(2)
+                if col1.button("✓ Yes, delete", use_container_width=True):
                     try:
-                        for node_id in selected_node_ids:
+                        for node_id in nodes_to_delete:
                             delete_node(conn, int(node_id))
-                        st.success(f"{len(selected_node_ids)} node(s) deleted.")
+                        st.success(f"{len(nodes_to_delete)} node(s) deleted.")
+                        st.session_state.confirm_delete_nodes = False
+                        st.session_state.nodes_to_delete = []
                         st.rerun()
                     except Exception as e:
                         st.error(f"Error deleting nodes: {e}")
-                else:
-                    st.warning("Select at least one node to delete.")
+                if col2.button("✗ Cancel", use_container_width=True):
+                    st.session_state.confirm_delete_nodes = False
+                    st.session_state.nodes_to_delete = []
+                    st.rerun()
         else:
             st.info("No nodes registered yet.")
 
@@ -257,10 +294,10 @@ with st.sidebar:
         if len(nodes) < 2:
             st.warning("Add at least two nodes before creating edges.")
         else:
-            source = st.selectbox("Source", options=list(node_options.keys()), key="source_select")
-            target = st.selectbox("Target", options=list(node_options.keys()), key="target_select")
-            directed = st.checkbox("Directed", value=True, key="new_edge_directed")
-            edge_description = st.text_area("Edge description (optional)", key="new_edge_description", height=80)
+            source = st.selectbox("Source", options=list(node_options.keys()), key=f"source_select_{st.session_state.input_key_counter}")
+            target = st.selectbox("Target", options=list(node_options.keys()), key=f"target_select_{st.session_state.input_key_counter}")
+            directed = st.checkbox("Directed", value=True, key=f"new_edge_directed_{st.session_state.input_key_counter}")
+            edge_description = st.text_area("Edge description (optional)", key=f"new_edge_description_{st.session_state.input_key_counter}", height=80)
             if st.button("➕ Add Edge", use_container_width=True):
                 if source and target:
                     try:
@@ -273,6 +310,8 @@ with st.sidebar:
                             st.session_state.current_graph
                         )
                         st.success("Edge added!")
+                        # Clear inputs by incrementing the counter
+                        st.session_state.input_key_counter += 1
                         st.rerun()
                     except Exception as e:
                         st.error(f"Error: {e}")
@@ -308,9 +347,9 @@ with st.sidebar:
                     "SELECT description, directed FROM edges WHERE id=?",
                     (edit_edge_select,)
                 ).fetchone()
-                new_description = st.text_area("Description", value=edge_to_edit[0] or "", key="edit_edge_description", height=80)
-                new_directed = st.checkbox("Directed", value=bool(edge_to_edit[1]), key="edit_edge_directed")
-                if st.button("💾 Save changes", use_container_width=True, key="save_edge_edit"):
+                new_description = st.text_area("Description", value=edge_to_edit[0] or "", key=f"edit_edge_description_{edit_edge_select}", height=80)
+                new_directed = st.checkbox("Directed", value=bool(edge_to_edit[1]), key=f"edit_edge_directed_{edit_edge_select}")
+                if st.button("💾 Save changes", use_container_width=True, key=f"save_edge_edit_{edit_edge_select}"):
                     try:
                         update_edge(conn, edit_edge_select, new_description or None, 1 if new_directed else 0)
                         st.success("Edge updated!")
@@ -326,24 +365,43 @@ with st.sidebar:
             )
             if st.button("🗑️ Delete selected edges", use_container_width=True):
                 if selected_edge_ids:
+                    st.session_state.confirm_delete_edges = True
+                    st.session_state.edges_to_delete = selected_edge_ids
+                    st.rerun()
+                else:
+                    st.warning("Select at least one edge to delete.")
+
+            # Confirmation dialog for deleting edges
+            if st.session_state.get("confirm_delete_edges", False):
+                st.warning("⚠️ Are you sure you want to delete the following edges?")
+                edges_to_delete = st.session_state.edges_to_delete
+                for edge_id in edges_to_delete:
+                    edge_label = next(label for label, id in edge_options if id == edge_id)
+                    st.write(f"- {edge_label}")
+                col1, col2 = st.columns(2)
+                if col1.button("✓ Yes, delete", use_container_width=True, key="confirm_edge_delete"):
                     try:
-                        for edge_id in selected_edge_ids:
+                        for edge_id in edges_to_delete:
                             delete_edge(conn, int(edge_id))
-                        st.success(f"{len(selected_edge_ids)} edge(s) deleted.")
+                        st.success(f"{len(edges_to_delete)} edge(s) deleted.")
+                        st.session_state.confirm_delete_edges = False
+                        st.session_state.edges_to_delete = []
                         st.rerun()
                     except Exception as e:
                         st.error(f"Error deleting edges: {e}")
-                else:
-                    st.warning("Select at least one edge to delete.")
+                if col2.button("✗ Cancel", use_container_width=True, key="cancel_edge_delete"):
+                    st.session_state.confirm_delete_edges = False
+                    st.session_state.edges_to_delete = []
+                    st.rerun()
         else:
             st.info("No edges registered yet.")
 
     with tab3:
         st.subheader("📄 Attach Document")
-        uploaded_file = st.file_uploader("Choose file", type=["pdf", "png", "jpg", "jpeg", "txt", "md", "csv"])
+        uploaded_file = st.file_uploader("Choose file", type=["pdf", "png", "jpg", "jpeg", "txt", "md", "csv"], key=f"doc_file_uploader_{st.session_state.input_key_counter}")
 
         if uploaded_file:
-            entity_type = st.selectbox("Attach to", ["node", "edge"])
+            entity_type = st.selectbox("Attach to", ["node", "edge"], key=f"doc_entity_type_{st.session_state.input_key_counter}")
 
             if entity_type == "node":
                 entities = conn.execute(
@@ -361,8 +419,8 @@ with st.sidebar:
 
             if entities:
                 entity_options = {f"{label} (ID: {id})": id for id, label in entities}
-                entity = st.selectbox("Select entity", options=list(entity_options.keys()))
-                description = st.text_area("Description (optional)")
+                entity = st.selectbox("Select entity", options=list(entity_options.keys()), key=f"doc_entity_select_{st.session_state.input_key_counter}")
+                description = st.text_area("Description (optional)", key=f"doc_description_{st.session_state.input_key_counter}")
 
                 if st.button("💾 Save Document", use_container_width=True):
                     if entity:
@@ -381,6 +439,8 @@ with st.sidebar:
                             """, (st.session_state.current_graph, entity_type, entity_options[entity], filename, uploaded_file.name, uploaded_file.type, description, datetime.now()))
                             conn.commit()
                             st.success(f"Document '{uploaded_file.name}' attached!")
+                            # Clear inputs by incrementing the counter
+                            st.session_state.input_key_counter += 1
                             st.rerun()
                         except Exception as e:
                             st.error(f"Error saving: {e}")
@@ -414,8 +474,8 @@ with st.sidebar:
             )
             if edit_doc_select:
                 doc_to_edit = docs[docs['id'] == edit_doc_select].iloc[0]
-                new_description = st.text_area("Description", value=doc_to_edit['description'] or "", key="edit_doc_description", height=80)
-                if st.button("💾 Save changes", use_container_width=True, key="save_doc_edit"):
+                new_description = st.text_area("Description", value=doc_to_edit['description'] or "", key=f"edit_doc_description_{edit_doc_select}", height=80)
+                if st.button("💾 Save changes", use_container_width=True, key=f"save_doc_edit_{edit_doc_select}"):
                     try:
                         update_document(conn, edit_doc_select, new_description or None)
                         st.success("Document updated!")
@@ -432,12 +492,31 @@ with st.sidebar:
                     if cols[0].button(f"🔗 Open", key=f"open_{doc['id']}"):
                         st.markdown(f"[Open file](uploads/{doc['filename']})", unsafe_allow_html=True)
                     if cols[1].button(f"🗑️ Delete document", key=f"delete_doc_{doc['id']}"):
-                        try:
-                            delete_document(conn, doc['id'])
-                            st.success(f"Document '{doc['original_name']}' deleted.")
-                            st.rerun()
-                        except Exception as e:
-                            st.error(f"Error deleting document: {e}")
+                        st.session_state.confirm_delete_doc = True
+                        st.session_state.doc_to_delete = doc
+                        st.rerun()
+
+            # Confirmation dialog for deleting document
+            if st.session_state.get("confirm_delete_doc", False):
+                doc_to_delete = st.session_state.doc_to_delete
+                entity_label = doc_to_delete['node_label'] if doc_to_delete['entity_type'] == 'node' else doc_to_delete['edge_label']
+                st.warning(f"⚠️ Are you sure you want to delete the following document?")
+                st.write(f"- {doc_to_delete['original_name']} ({entity_label})")
+                st.write(f"**Description:** {doc_to_delete['description'] or 'No description'}")
+                col1, col2 = st.columns(2)
+                if col1.button("✓ Yes, delete", use_container_width=True, key="confirm_doc_delete"):
+                    try:
+                        delete_document(conn, doc_to_delete['id'])
+                        st.success(f"Document '{doc_to_delete['original_name']}' deleted.")
+                        st.session_state.confirm_delete_doc = False
+                        st.session_state.doc_to_delete = None
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Error deleting document: {e}")
+                if col2.button("✗ Cancel", use_container_width=True, key="cancel_doc_delete"):
+                    st.session_state.confirm_delete_doc = False
+                    st.session_state.doc_to_delete = None
+                    st.rerun()
         else:
             st.info("No attached documents.")
 
