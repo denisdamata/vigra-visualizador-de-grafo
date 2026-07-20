@@ -19,8 +19,8 @@ credentials
 .streamlit/
 
 # Uploads and local DB
-uploads/
-database/
+uploads/*
+database/*
 *.sqlite
 *.db
 
