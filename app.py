@@ -62,6 +62,22 @@ st.markdown(
         .stMarkdown, .stText, .stSelectbox, .stTextArea, .stNumberInput {
             color: #111 !important;
         }
+        [data-testid="stSidebarHeader"] {
+            margin-bottom: 1rem !important;
+            position: absolute !important;
+            top: -0.6rem !important;
+            left: 0 !important;
+            right: 0 !important;
+            z-index: 100 !important;
+            background: transparent !important;
+        }
+        [data-testid="stSidebar"] > div:first-child {
+            margin-top: 1rem !important;
+
+        }
+        .st-key-settings_btn {
+            margin-left: -4rem !important;
+        }
     </style>
     """,
     unsafe_allow_html=True,
