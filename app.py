@@ -186,16 +186,7 @@ with st.sidebar:
                     st.info("Only the default graph exists.")
             else:
                 st.info("There are no graphs to delete.")
-        st.divider()
-    else:
-        st.divider()
-    
-    # Visibility checkboxes
-    st.subheader("👁️ Visibility")
-    show_invisible_nodes = st.checkbox("Show invisible nodes", value=False, key="show_invisible_nodes")
-    show_invisible_edges = st.checkbox("Show invisible edges", value=False, key="show_invisible_edges")
-    st.divider()
-    
+
     tab1, tab2, tab3 = st.tabs(["➕ Nodes", "🔗 Edges", "📄 Documents"])
 
     # [TABS 1 e 2 ... (código existente, mas usando as funções do database.py)]
@@ -530,6 +521,12 @@ with st.sidebar:
                     st.rerun()
         else:
             st.info("No attached documents.")
+
+    # Visibility checkboxes at the bottom
+    st.divider()
+    st.subheader("👁️ Visibility")
+    show_invisible_nodes = st.checkbox("Show invisible nodes", value=False, key="show_invisible_nodes")
+    show_invisible_edges = st.checkbox("Show invisible edges", value=False, key="show_invisible_edges")
 
 # ============================================
 # MAIN AREA: Graph visualization
