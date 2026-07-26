@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 from database import (
     get_connection, add_node, add_edge, delete_node, delete_edge, delete_document,
-    get_nodes, get_edges, get_all_data, update_node, update_edge, update_document,
+    get_nodes, get_edges, get_documents, get_all_data, update_node, update_edge, update_document,
     create_graph, list_graphs, delete_graph, graph_exists
 )
 from graph_builder import build_network, display_network
@@ -190,6 +190,12 @@ with st.sidebar:
     else:
         st.divider()
     
+    # Visibility checkboxes
+    st.subheader("👁️ Visibility")
+    show_invisible_nodes = st.checkbox("Show invisible nodes", value=False, key="show_invisible_nodes")
+    show_invisible_edges = st.checkbox("Show invisible edges", value=False, key="show_invisible_edges")
+    st.divider()
+    
     tab1, tab2, tab3 = st.tabs(["➕ Nodes", "🔗 Edges", "📄 Documents"])
 
     # [TABS 1 e 2 ... (código existente, mas usando as funções do database.py)]
@@ -199,10 +205,11 @@ with st.sidebar:
         label = st.text_input("Label", key=f"new_node_label_{st.session_state.input_key_counter}")
         layer = st.number_input("Layer", min_value=0, step=1, key=f"new_node_layer_{st.session_state.input_key_counter}")
         node_description = st.text_area("Description (optional)", key=f"new_node_description_{st.session_state.input_key_counter}", height=80)
+        node_visible = st.checkbox("Visible", value=True, key=f"new_node_visible_{st.session_state.input_key_counter}")
         if st.button("➕ Add Node", use_container_width=True):
             if label:
                 try:
-                    add_node(conn, label, layer, node_description or None, st.session_state.current_graph)
+                    add_node(conn, label, layer, node_description or None, 1 if node_visible else 0, st.session_state.current_graph)
                     st.success(f"Node '{label}' added!")
                     # Clear inputs by incrementing the counter
                     st.session_state.input_key_counter += 1
@@ -213,7 +220,7 @@ with st.sidebar:
         st.divider()
         st.subheader("📋 Existing Nodes")
         nodes_df = pd.read_sql(
-            "SELECT id, label, layer, description FROM nodes WHERE graph_id=? ORDER BY layer",
+            "SELECT id, label, layer, description, visible FROM nodes WHERE graph_id=? ORDER BY layer",
             conn,
             params=(st.session_state.current_graph,)
         )
@@ -236,9 +243,10 @@ with st.sidebar:
                 new_label = st.text_input("Label", value=node_to_edit['label'], key=f"edit_node_label_{edit_node_select}")
                 new_layer = st.number_input("Layer", value=node_to_edit['layer'], min_value=0, step=1, key=f"edit_node_layer_{edit_node_select}")
                 new_description = st.text_area("Description", value=node_to_edit['description'] or "", key=f"edit_node_description_{edit_node_select}", height=80)
+                new_visible = st.checkbox("Visible", value=bool(node_to_edit['visible']), key=f"edit_node_visible_{edit_node_select}")
                 if st.button("💾 Save changes", use_container_width=True, key=f"save_node_edit_{edit_node_select}"):
                     try:
-                        update_node(conn, edit_node_select, new_label, new_layer, new_description or None)
+                        update_node(conn, edit_node_select, new_label, new_layer, new_description or None, 1 if new_visible else 0)
                         st.success("Node updated!")
                         st.rerun()
                     except Exception as e:
@@ -298,6 +306,7 @@ with st.sidebar:
             target = st.selectbox("Target", options=list(node_options.keys()), key=f"target_select_{st.session_state.input_key_counter}")
             directed = st.checkbox("Directed", value=True, key=f"new_edge_directed_{st.session_state.input_key_counter}")
             edge_description = st.text_area("Edge description (optional)", key=f"new_edge_description_{st.session_state.input_key_counter}", height=80)
+            edge_visible = st.checkbox("Visible", value=True, key=f"new_edge_visible_{st.session_state.input_key_counter}")
             if st.button("➕ Add Edge", use_container_width=True):
                 if source and target:
                     try:
@@ -307,6 +316,7 @@ with st.sidebar:
                             node_options[target],
                             edge_description or None,
                             1 if directed else 0,
+                            1 if edge_visible else 0,
                             st.session_state.current_graph
                         )
                         st.success("Edge added!")
@@ -319,7 +329,7 @@ with st.sidebar:
         st.divider()
         st.subheader("📋 Existing Edges")
         edges_df = pd.read_sql("""
-            SELECT e.id, n1.label as source_label, n2.label as target_label, e.directed
+            SELECT e.id, n1.label as source_label, n2.label as target_label, e.directed, e.visible
             FROM edges e
             JOIN nodes n1 ON e.source = n1.id
             JOIN nodes n2 ON e.target = n2.id
@@ -344,14 +354,15 @@ with st.sidebar:
             )
             if edit_edge_select:
                 edge_to_edit = conn.execute(
-                    "SELECT description, directed FROM edges WHERE id=?",
+                    "SELECT description, directed, visible FROM edges WHERE id=?",
                     (edit_edge_select,)
                 ).fetchone()
                 new_description = st.text_area("Description", value=edge_to_edit[0] or "", key=f"edit_edge_description_{edit_edge_select}", height=80)
                 new_directed = st.checkbox("Directed", value=bool(edge_to_edit[1]), key=f"edit_edge_directed_{edit_edge_select}")
+                new_visible = st.checkbox("Visible", value=bool(edge_to_edit[2]), key=f"edit_edge_visible_{edit_edge_select}")
                 if st.button("💾 Save changes", use_container_width=True, key=f"save_edge_edit_{edit_edge_select}"):
                     try:
-                        update_edge(conn, edit_edge_select, new_description or None, 1 if new_directed else 0)
+                        update_edge(conn, edit_edge_select, new_description or None, 1 if new_directed else 0, 1 if new_visible else 0)
                         st.success("Edge updated!")
                         st.rerun()
                     except Exception as e:
@@ -524,8 +535,30 @@ with st.sidebar:
 # MAIN AREA: Graph visualization
 # ============================================
 
-# Fetch data
-nodes, edges, documents = get_all_data(conn, st.session_state.current_graph)
+# Fetch data with visibility settings
+show_invisible_nodes = st.session_state.get("show_invisible_nodes", False)
+show_invisible_edges = st.session_state.get("show_invisible_edges", False)
+
+# Get all edges first to check for invisible nodes needed
+if show_invisible_edges:
+    # Get all edges (visible and invisible)
+    all_edges = get_edges(conn, st.session_state.current_graph, show_invisible=True)
+    # Get all node IDs from edges
+    node_ids_from_edges = set()
+    for edge in all_edges:
+        if len(edge) >= 3:
+            node_ids_from_edges.add(edge[1])  # source
+            node_ids_from_edges.add(edge[2])  # target
+    # Get nodes that are either visible or needed for edges
+    nodes = []
+    all_nodes = get_nodes(conn, st.session_state.current_graph, show_invisible=True)
+    for node in all_nodes:
+        if node[0] in node_ids_from_edges or (len(node) >= 5 and node[4] == 1) or (len(node) < 5):
+            nodes.append(node)
+    edges = all_edges
+    documents = get_documents(conn, st.session_state.current_graph)
+else:
+    nodes, edges, documents = get_all_data(conn, st.session_state.current_graph, show_invisible_nodes, show_invisible_edges)
 
 if not nodes:
     st.info("Add your first nodes and edges in the sidebar to start.")

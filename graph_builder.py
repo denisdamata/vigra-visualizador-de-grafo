@@ -47,11 +47,15 @@ def build_network(nodes, edges, documents=None):
     layer_span = max_layer - min_layer if max_layer != min_layer else 1
 
     for node in nodes:
-        if len(node) >= 4:
+        if len(node) >= 5:
+            node_id, label, layer, description, visible = node[0], node[1], node[2], node[3], node[4]
+        elif len(node) >= 4:
             node_id, label, layer, description = node[0], node[1], node[2], node[3]
+            visible = 1
         else:
             node_id, label, layer = node[0], node[1], node[2]
             description = None
+            visible = 1
 
         t = (layer - min_layer) / layer_span
         rgb_color = interpolate_color(start_color, end_color, t)
@@ -60,6 +64,16 @@ def build_network(nodes, edges, documents=None):
 
         # Calculate node size based on normalized layer
         node_size = min_node_size + (max_node_size - min_node_size) * t
+        
+        # Apply lighter color to invisible nodes (mix with white to simulate transparency)
+        if visible == 0:
+            # Mix with white (255, 255, 255) at 70% to simulate 30% transparency
+            light_rgb = tuple(int(rgb_color[i] + (255 - rgb_color[i]) * 0.7) for i in range(3))
+            background_color = rgb_to_hex(light_rgb)
+            border_color = rgb_to_hex(light_rgb)
+        else:
+            background_color = color_hex
+            border_color = color_hex
 
         title_parts = [f"Layer: {layer}"]
         if description:
@@ -73,7 +87,7 @@ def build_network(nodes, edges, documents=None):
             node_id,
             label=label,
             title="\n".join(title_parts),
-            color=color_hex,
+            color={"background": background_color, "border": border_color},
             size=node_size,
             borderWidth=2,
             font={
@@ -87,15 +101,20 @@ def build_network(nodes, edges, documents=None):
 
     # Add edges with an intermediate color based on the endpoints
     for edge in edges:
-        if len(edge) >= 5:
+        if len(edge) >= 6:
+            edge_id, source, target, edesc, directed, visible = edge[0], edge[1], edge[2], edge[3], edge[4], edge[5]
+        elif len(edge) >= 5:
             edge_id, source, target, edesc, directed = edge[0], edge[1], edge[2], edge[3], edge[4]
+            visible = 1
         elif len(edge) == 4:
             edge_id, source, target, edesc = edge[0], edge[1], edge[2], edge[3]
             directed = 1
+            visible = 1
         else:
             edge_id, source, target = edge[0], edge[1], edge[2]
             edesc = None
             directed = 1
+            visible = 1
 
         source_color = hex_to_rgb(node_colors.get(source, "#888888"))
         target_color = hex_to_rgb(node_colors.get(target, "#888888"))

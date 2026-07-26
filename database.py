@@ -27,6 +27,7 @@ def _create_tables(conn):
         label TEXT,
         layer INTEGER,
         description TEXT,
+        visible INTEGER DEFAULT 1,
         FOREIGN KEY (graph_id) REFERENCES graphs(id),
         UNIQUE(graph_id, label)
     )
@@ -39,6 +40,7 @@ def _create_tables(conn):
         target INTEGER,
         description TEXT,
         directed INTEGER DEFAULT 1,
+        visible INTEGER DEFAULT 1,
         FOREIGN KEY (graph_id) REFERENCES graphs(id),
         FOREIGN KEY (source) REFERENCES nodes(id),
         FOREIGN KEY (target) REFERENCES nodes(id)
@@ -67,6 +69,9 @@ def _create_tables(conn):
         cursor.execute("UPDATE nodes SET graph_id=1 WHERE graph_id IS NULL")
     if 'description' not in cols_n:
         cursor.execute("ALTER TABLE nodes ADD COLUMN description TEXT")
+    if 'visible' not in cols_n:
+        cursor.execute("ALTER TABLE nodes ADD COLUMN visible INTEGER DEFAULT 1")
+        cursor.execute("UPDATE nodes SET visible=1 WHERE visible IS NULL")
     
     cols_e = [r[1] for r in conn.execute("PRAGMA table_info(edges)").fetchall()]
     if 'graph_id' not in cols_e:
@@ -77,6 +82,9 @@ def _create_tables(conn):
     if 'directed' not in cols_e:
         cursor.execute("ALTER TABLE edges ADD COLUMN directed INTEGER DEFAULT 1")
         cursor.execute("UPDATE edges SET directed=1 WHERE directed IS NULL")
+    if 'visible' not in cols_e:
+        cursor.execute("ALTER TABLE edges ADD COLUMN visible INTEGER DEFAULT 1")
+        cursor.execute("UPDATE edges SET visible=1 WHERE visible IS NULL")
     
     cols_d = [r[1] for r in conn.execute("PRAGMA table_info(documents)").fetchall()]
     if 'graph_id' not in cols_d:
@@ -89,38 +97,50 @@ def _create_tables(conn):
     cursor.execute("INSERT OR IGNORE INTO graphs (id, name, created_at, updated_at) VALUES (1, 'Default', datetime('now'), datetime('now'))")
     conn.commit()
 
-def add_node(conn, label, layer, description=None, graph_id=1):
+def add_node(conn, label, layer, description=None, visible=1, graph_id=1):
     cursor = conn.cursor()
     cursor.execute(
-        "INSERT INTO nodes (graph_id, label, layer, description) VALUES (?, ?, ?, ?)",
-        (graph_id, label, layer, description)
+        "INSERT INTO nodes (graph_id, label, layer, description, visible) VALUES (?, ?, ?, ?, ?)",
+        (graph_id, label, layer, description, visible)
     )
     conn.commit()
     return cursor.lastrowid
 
-def add_edge(conn, source, target, description=None, directed=1, graph_id=1):
+def add_edge(conn, source, target, description=None, directed=1, visible=1, graph_id=1):
     cursor = conn.cursor()
     cursor.execute(
-        "INSERT INTO edges (graph_id, source, target, description, directed) VALUES (?, ?, ?, ?, ?)",
-        (graph_id, source, target, description, directed)
+        "INSERT INTO edges (graph_id, source, target, description, directed, visible) VALUES (?, ?, ?, ?, ?, ?)",
+        (graph_id, source, target, description, directed, visible)
     )
     conn.commit()
     return cursor.lastrowid
 
-def update_node(conn, node_id, label, layer, description=None):
+def update_node(conn, node_id, label, layer, description=None, visible=None):
     cursor = conn.cursor()
-    cursor.execute(
-        "UPDATE nodes SET label=?, layer=?, description=? WHERE id=?",
-        (label, layer, description, node_id)
-    )
+    if visible is not None:
+        cursor.execute(
+            "UPDATE nodes SET label=?, layer=?, description=?, visible=? WHERE id=?",
+            (label, layer, description, visible, node_id)
+        )
+    else:
+        cursor.execute(
+            "UPDATE nodes SET label=?, layer=?, description=? WHERE id=?",
+            (label, layer, description, node_id)
+        )
     conn.commit()
 
-def update_edge(conn, edge_id, description=None, directed=1):
+def update_edge(conn, edge_id, description=None, directed=1, visible=None):
     cursor = conn.cursor()
-    cursor.execute(
-        "UPDATE edges SET description=?, directed=? WHERE id=?",
-        (description, directed, edge_id)
-    )
+    if visible is not None:
+        cursor.execute(
+            "UPDATE edges SET description=?, directed=?, visible=? WHERE id=?",
+            (description, directed, visible, edge_id)
+        )
+    else:
+        cursor.execute(
+            "UPDATE edges SET description=?, directed=? WHERE id=?",
+            (description, directed, edge_id)
+        )
     conn.commit()
 
 def update_document(conn, document_id, description=None):
@@ -159,11 +179,17 @@ def delete_document(conn, document_id):
     cursor.execute("DELETE FROM documents WHERE id=?", (document_id,))
     conn.commit()
 
-def get_nodes(conn, graph_id=1):
-    return conn.execute("SELECT id, label, layer, description FROM nodes WHERE graph_id=? ORDER BY layer", (graph_id,)).fetchall()
+def get_nodes(conn, graph_id=1, show_invisible=False):
+    if show_invisible:
+        return conn.execute("SELECT id, label, layer, description, visible FROM nodes WHERE graph_id=? ORDER BY layer", (graph_id,)).fetchall()
+    else:
+        return conn.execute("SELECT id, label, layer, description, visible FROM nodes WHERE graph_id=? AND visible=1 ORDER BY layer", (graph_id,)).fetchall()
 
-def get_edges(conn, graph_id=1):
-    return conn.execute("SELECT id, source, target, description, directed FROM edges WHERE graph_id=?", (graph_id,)).fetchall()
+def get_edges(conn, graph_id=1, show_invisible=False):
+    if show_invisible:
+        return conn.execute("SELECT id, source, target, description, directed, visible FROM edges WHERE graph_id=?", (graph_id,)).fetchall()
+    else:
+        return conn.execute("SELECT id, source, target, description, directed, visible FROM edges WHERE graph_id=? AND visible=1", (graph_id,)).fetchall()
 
 def get_documents(conn, graph_id=1):
     return conn.execute(
@@ -171,9 +197,9 @@ def get_documents(conn, graph_id=1):
         (graph_id,)
     ).fetchall()
 
-def get_all_data(conn, graph_id=1):
+def get_all_data(conn, graph_id=1, show_invisible_nodes=False, show_invisible_edges=False):
     """Return all data (nodes, edges, and documents) to build the graph."""
-    return get_nodes(conn, graph_id), get_edges(conn, graph_id), get_documents(conn, graph_id)
+    return get_nodes(conn, graph_id, show_invisible_nodes), get_edges(conn, graph_id, show_invisible_edges), get_documents(conn, graph_id)
 
 def create_graph(conn, name):
     cursor = conn.cursor()
